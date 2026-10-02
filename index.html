@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeamTask - ระบบจัดการและติดตามงานทีม</title>
+  <!-- Google Fonts: Prompt & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- SortableJS for smooth Drag and Drop -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Prompt', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Prompt', sans-serif;
+    }
+    .kanban-column-content {
+      min-height: 480px;
+    }
+    .sortable-ghost {
+      opacity: 0.4;
+      background: #e0e7ff;
+      border: 2px dashed #4f46e5 !important;
+    }
+    .sortable-chosen {
+      cursor: grabbing;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+            <i data-lucide="check-square" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-lg font-bold text-slate-900 leading-tight">TeamTask</h1>
+              <span class="text-xs bg-indigo-100 text-indigo-700 font-medium px-2 py-0.5 rounded-full">v1.0</span>
+            </div>
+            <p class="text-xs text-slate-500 hidden sm:block">ระบบติดตามและจัดการงานสำหรับทีม</p>
+          </div>
+        </div>
+
+        <!-- Role / User Switcher -->
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <span class="text-xs text-slate-500 font-medium px-2 hidden md:inline flex items-center gap-1">
+              <i data-lucide="user-check" class="w-3.5 h-3.5"></i> สลับมุมมอง:
+            </span>
+            <select id="userSelector" onchange="switchCurrentUser(this.value)" class="bg-white text-xs sm:text-sm font-semibold text-slate-800 py-1.5 px-3 rounded-lg border-0 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+
+          <!-- Add Task Button -->
+          <button onclick="openTaskModal()" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-medium py-2 px-3.5 rounded-xl shadow-sm shadow-indigo-200 transition-all hover:scale-[1.02] active:scale-[0.98]">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>สร้างงานใหม่</span>
+          </button>
+
+          <!-- Settings / Data Menu -->
+          <div class="relative">
+            <button onclick="toggleMenu('moreMenu')" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition">
+              <i data-lucide="more-vertical" class="w-5 h-5"></i>
+            </button>
+            <div id="moreMenu" class="hidden absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 text-xs text-slate-700 z-50">
+              <button onclick="openTeamManagementModal(); toggleMenu('moreMenu')" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-slate-500"></i> จัดการรายชื่อทีมงาน
+              </button>
+              <button onclick="exportData(); toggleMenu('moreMenu')" class="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center gap-2">
+                <i data-lucide="download" class="w-4 h-4 text-slate-500"></i> ดาวน์โหลดข้อมูล (Backup)
+              </button>
+              <button onclick="resetToSampleData(); toggleMenu('moreMenu')" class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-2 border-t border-slate-100 mt-1">
+                <i data-lucide="rotate-ccw" class="w-4 h-4 text-red-500"></i> รีเซ็ตเป็นข้อมูลตัวอย่าง
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Active User Status Bar -->
+  <div class="bg-indigo-50/60 border-b border-indigo-100/60 py-2.5 px-4 sm:px-8">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs sm:text-sm">
+      <div class="flex items-center space-x-2">
+        <span class="flex h-2.5 w-2.5 relative">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <span class="text-slate-600">กำลังดูในมุมมอง:</span>
+        <span id="currentViewBadge" class="font-bold text-indigo-900 bg-white px-2.5 py-0.5 rounded-full border border-indigo-200 shadow-xs">
+          หัวหน้างาน (ผู้จัดการ)
+        </span>
+      </div>
+      <div id="viewModeNotice" class="text-slate-500 text-xs flex items-center gap-1.5">
+        <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-500"></i>
+        <span>แสดงภาพรวมงานทั้งหมดของทุกคนในทีม สามารถมอบหมายงานได้</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+
+    <!-- ================= MANAGER VIEW ================= -->
+    <div id="managerView" class="space-y-6">
+      
+      <!-- Metrics Dashboard Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Total Tasks -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-medium text-slate-500">งานทั้งหมดในทีม</span>
+            <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+              <i data-lucide="layers" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="statTotal" class="text-2xl sm:text-3xl font-bold text-slate-900">0</span>
+            <span class="text-xs text-slate-400">รายการ</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">จากสมาชิกทั้งหมดในทีม</p>
+        </div>
+
+        <!-- In Progress -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-medium text-slate-500">กำลังดำเนินการ</span>
+            <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+              <i data-lucide="clock" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="statInProgress" class="text-2xl sm:text-3xl font-bold text-amber-600">0</span>
+            <span class="text-xs text-slate-400">รายการ</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">กำลังเร่งมือทำอยู่ในขณะนี้</p>
+        </div>
+
+        <!-- Overdue & Due Soon -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-medium text-slate-500">งานวิกฤต / ใกล้ส่ง</span>
+            <div class="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="statOverdue" class="text-2xl sm:text-3xl font-bold text-rose-600">0</span>
+            <span class="text-xs text-slate-400">รายการ</span>
+          </div>
+          <p class="text-xs text-rose-500 mt-1" id="statOverdueSubtitle">เลยกำหนดแล้ว 0 รายการ</p>
+        </div>
+
+        <!-- Completed Tasks -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition">
+          <div class="flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-medium text-slate-500">งานที่เสร็จสิ้นแล้ว</span>
+            <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="statDone" class="text-2xl sm:text-3xl font-bold text-emerald-600">0</span>
+            <span id="statDonePercent" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">0%</span>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2.5 overflow-hidden">
+            <div id="statProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Team Members Progress Overview Bar -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i> สรุปความคืบหน้ารายบุคคล
+            </h2>
+            <p class="text-xs text-slate-500">คลิกที่สมาชิกเพื่อกรองดูเฉพาะงานของคนนั้น หรือสลับไปดูในมุมมองของเขาได้ทันที</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="filterManagerByMember('all')" id="btnFilterAll" class="text-xs px-3 py-1.5 rounded-lg font-medium bg-indigo-600 text-white shadow-xs">
+              ดูทุกคน (All)
+            </button>
+          </div>
+        </div>
+
+        <div id="memberProgressGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <!-- Member workload cards injected by JS -->
+        </div>
+      </div>
+
+      <!-- Manager Tab & Filter Bar -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+        <!-- View Type Switcher (Board vs Table) -->
+        <div class="flex items-center space-x-1 bg-slate-200/80 p-1 rounded-xl w-fit">
+          <button onclick="setManagerDisplayMode('kanban')" id="mgrTabKanban" class="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white text-slate-900 shadow-xs transition">
+            <i data-lucide="kanban" class="w-3.5 h-3.5 text-indigo-600"></i> Kanban Board รวม
+          </button>
+          <button onclick="setManagerDisplayMode('table')" id="mgrTabTable" class="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition">
+            <i data-lucide="table" class="w-3.5 h-3.5"></i> ตารางรายการงาน
+          </button>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="flex items-center gap-2 flex-1 sm:justify-end">
+          <div class="relative flex-1 sm:max-w-xs">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+            <input type="text" id="mgrSearchInput" oninput="renderManagerView()" placeholder="ค้นหางาน, ผู้รับผิดชอบ..." class="w-full text-xs sm:text-sm bg-white pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs">
+          </div>
+          <select id="mgrFilterStatus" onchange="renderManagerView()" class="text-xs sm:text-sm bg-white px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer">
+            <option value="all">ทุกสถานะ</option>
+            <option value="todo">รอดำเนินการ</option>
+            <option value="in_progress">กำลังดำเนินการ</option>
+            <option value="review">รอตรวจสอบ</option>
+            <option value="done">เสร็จสิ้น</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Container: Manager Master Kanban Board -->
+      <div id="managerKanbanContainer">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Container: Manager Table List View -->
+      <div id="managerTableContainer" class="hidden bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-xs font-semibold">
+                <th class="py-3 px-4">ชื่องานและรายละเอียด</th>
+                <th class="py-3 px-4">ผู้รับผิดชอบ</th>
+                <th class="py-3 px-4">สถานะ</th>
+                <th class="py-3 px-4">ระดับความสำคัญ</th>
+                <th class="py-3 px-4">วันที่สร้าง</th>
+                <th class="py-3 px-4">กำหนดส่ง (Deadline)</th>
+                <th class="py-3 px-4 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="managerTableBody" class="divide-y divide-slate-100">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ================= TEAM MEMBER VIEW ================= -->
+    <div id="memberView" class="hidden space-y-6">
+      
+      <!-- Member Welcome Banner -->
+      <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 rounded-2xl p-5 sm:p-6 text-white shadow-md shadow-indigo-100">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div id="memberAvatar" class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center text-xl font-bold shadow-inner">
+              ก
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 id="memberNameGreeting" class="text-xl font-bold">สวัสดี, คุณกิตติพงษ์</h2>
+                <span id="memberRoleTag" class="text-xs bg-white/25 px-2.5 py-0.5 rounded-full font-medium backdrop-blur-xs">Frontend Dev</span>
+              </div>
+              <p class="text-xs sm:text-sm text-indigo-100 mt-1">นี่คือบอร์ดงานส่วนตัวของคุณ สามารถลากการ์ดเพื่ออัปเดตสถานะงานได้ทันที</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="bg-white/10 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-white/20 text-center">
+              <span class="block text-xs text-indigo-200">งานที่ต้องทำ</span>
+              <span id="memberPendingCount" class="text-lg font-bold">0</span>
+            </div>
+            <div class="bg-white/10 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-white/20 text-center">
+              <span class="block text-xs text-indigo-200">งานเสร็จแล้ว</span>
+              <span id="memberDoneCount" class="text-lg font-bold">0</span>
+            </div>
+            <button onclick="openTaskModalForCurrentUser()" class="bg-white text-indigo-600 hover:bg-indigo-50 font-semibold px-4 py-2.5 rounded-xl shadow-xs text-xs sm:text-sm flex items-center gap-1.5 transition">
+              <i data-lucide="plus" class="w-4 h-4"></i> เพิ่มงานของฉัน
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Member Filter / Search -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <i data-lucide="kanban" class="w-4 h-4 text-indigo-600"></i> กระดานงานส่วนตัว (My Kanban Board)
+          </span>
+          <span class="text-xs text-slate-400">| ลากวางการ์ดเพื่อเปลี่ยนสถานะ</span>
+        </div>
+        <div class="relative w-full sm:w-72">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+          <input type="text" id="memberSearchInput" oninput="renderMemberKanban()" placeholder="ค้นหางานของฉัน..." class="w-full text-xs sm:text-sm bg-white pl-9 pr-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs">
+        </div>
+      </div>
+
+      <!-- Member Kanban Board Container -->
+      <div id="memberKanbanContainer">
+        <!-- Rendered by JS -->
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>TeamTask System &copy; ข้อมูลบันทึกไว้ใน Browser (LocalStorage) พร้อมใช้งาน</span>
+      <div class="flex items-center space-x-3">
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-rose-500"></span> สีแดง = เลยกำหนด</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> สีส้ม = ครบกำหนดใน 2 วัน</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> สีเขียว = เสร็จสิ้น</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Task Modal (Create & Edit) -->
+  <div id="taskModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 id="taskModalTitle" class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-4 h-4 text-indigo-600"></i> สร้างงานใหม่
+        </h3>
+        <button onclick="closeTaskModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="taskForm" onsubmit="handleTaskSubmit(event)" class="space-y-4 mt-4 text-xs sm:text-sm">
+        <input type="hidden" id="taskId">
+
+        <!-- Title -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">ชื่องาน <span class="text-rose-500">*</span></label>
+          <input type="text" id="taskTitle" required placeholder="เช่น ออกแบบหน้าเว็บ, แก้ไขบั๊กการคำนวณ" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800">
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">รายละเอียดงาน</label>
+          <textarea id="taskDescription" rows="3" placeholder="ระบุรายละเอียดเพิ่มเติม ข้อกำหนด หรือลิงก์ที่เกี่ยวข้อง..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800"></textarea>
+        </div>
+
+        <!-- Assignee & Status -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ผู้รับผิดชอบ <span class="text-rose-500">*</span></label>
+            <select id="taskAssignee" required class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 cursor-pointer">
+              <!-- Injected by JS -->
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">สถานะ</label>
+            <select id="taskStatus" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 cursor-pointer">
+              <option value="todo">📥 รอดำเนินการ (To Do)</option>
+              <option value="in_progress">⚡ กำลังดำเนินการ (In Progress)</option>
+              <option value="review">🔍 รอตรวจสอบ (Review)</option>
+              <option value="done">🎉 เสร็จสิ้น (Done)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Priority & Start Date -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ระดับความสำคัญ</label>
+            <select id="taskPriority" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 cursor-pointer">
+              <option value="normal">🟢 ปกติ (Normal)</option>
+              <option value="medium">🟡 ปานกลาง (Medium)</option>
+              <option value="high">🔴 ด่วนมาก (Urgent)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">วันที่เริ่มต้น / สร้างงาน</label>
+            <input type="date" id="taskStartDate" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800">
+          </div>
+        </div>
+
+        <!-- Deadline -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">กำหนดส่ง (Deadline) <span class="text-rose-500">*</span></label>
+          <input type="date" id="taskDeadline" required class="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800">
+          <p class="text-[11px] text-slate-400 mt-1">ระบบจะแจ้งเตือนเมื่อใกล้ถึงวันส่ง และไฮไลต์สีแดงเมื่องานเกินกำหนด</p>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeTaskModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition">
+            ยกเลิก
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-xs shadow-indigo-200 transition">
+            บันทึกข้อมูล
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Team Management Modal -->
+  <div id="teamModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i> จัดการรายชื่อสมาชิกในทีม
+        </h3>
+        <button onclick="closeTeamModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Add New Member Form -->
+      <form onsubmit="handleAddMember(event)" class="mt-4 flex gap-2">
+        <input type="text" id="newMemberName" required placeholder="ชื่อสมาชิกใหม่..." class="flex-1 text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <input type="text" id="newMemberRole" placeholder="ตำแหน่ง..." class="w-28 text-xs sm:text-sm px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium shadow-xs transition">
+          เพิ่ม
+        </button>
+      </form>
+
+      <!-- Member List -->
+      <div class="mt-4 divide-y divide-slate-100 max-h-60 overflow-y-auto" id="modalMemberList">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-100 text-right">
+        <button onclick="closeTeamModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium transition">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail View Modal -->
+  <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <span id="detailPriorityBadge" class="text-xs px-2.5 py-0.5 rounded-full font-semibold">ปกติ</span>
+        <button onclick="closeDetailModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="mt-4 space-y-3">
+        <h3 id="detailTitle" class="text-lg font-bold text-slate-900 leading-snug">ชื่องาน</h3>
+        <p id="detailDescription" class="text-sm text-slate-600 whitespace-pre-line bg-slate-50 p-3.5 rounded-xl border border-slate-100">รายละเอียด</p>
+
+        <div class="grid grid-cols-2 gap-3 text-xs pt-2">
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <span class="text-slate-400 block">ผู้รับผิดชอบ:</span>
+            <span id="detailAssignee" class="font-semibold text-slate-800 text-sm mt-0.5 block">กิตติพงษ์</span>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <span class="text-slate-400 block">สถานะปัจจุบัน:</span>
+            <span id="detailStatus" class="font-semibold text-slate-800 text-sm mt-0.5 block">กำลังดำเนินการ</span>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <span class="text-slate-400 block">วันที่เริ่ม:</span>
+            <span id="detailStartDate" class="font-medium text-slate-700 mt-0.5 block">2026-09-20</span>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <span class="text-slate-400 block">กำหนดส่ง (Deadline):</span>
+            <span id="detailDeadline" class="font-medium text-slate-700 mt-0.5 block">2026-10-05</span>
+          </div>
+        </div>
+      </div>
+      <div class="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center">
+        <button id="btnDeleteFromDetail" class="text-xs text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> ลบงานนี้
+        </button>
+        <div class="flex gap-2">
+          <button id="btnEditFromDetail" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition">
+            <i data-lucide="edit" class="w-3.5 h-3.5"></i> แก้ไขงาน
+          </button>
+          <button onclick="closeDetailModal()" class="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition">
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <script>
+    // --- Initial Constants & Sample Data ---
+    const COLUMNS = [
+      { id: 'todo', title: 'รอดำเนินการ', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200', icon: 'inbox' },
+      { id: 'in_progress', title: 'กำลังดำเนินการ', badgeClass: 'bg-amber-100 text-amber-800 border-amber-200', icon: 'zap' },
+      { id: 'review', title: 'รอตรวจสอบ', badgeClass: 'bg-purple-100 text-purple-800 border-purple-200', icon: 'eye' },
+      { id: 'done', title: 'เสร็จสิ้น', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: 'check-circle' }
+    ];
+
+    const DEFAULT_MEMBERS = [
+      { id: 'm1', name: 'กิตติพงษ์ พรหมมา', role: 'Frontend Developer', avatarColor: 'bg-blue-500' },
+      { id: 'm2', name: 'สุดารัตน์ ใจดี', role: 'UI/UX Designer', avatarColor: 'bg-pink-500' },
+      { id: 'm3', name: 'อภิสิทธิ์ วงศ์ไทย', role: 'Backend & Database', avatarColor: 'bg-emerald-500' },
+      { id: 'm4', name: 'ธนากร สุขเกษม', role: 'QA & Testing', avatarColor: 'bg-amber-500' }
+    ];
+
+    // Helper to calculate relative dates easily
+    function getOffsetDate(days) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    }
+
+    const SAMPLE_TASKS = [
+      {
+        id: 't-101',
+        title: 'ออกแบบหน้าจอ UI สำหรับระบบจัดเก็บสต็อกสินค้า',
+        description: 'ออกแบบ Wireframe และ Prototype สีสันสดใสใช้งานง่ายบน Figma ให้เสร็จก่อนส่งทีมพัฒนา',
+        assigneeId: 'm2',
+        startDate: getOffsetDate(-4),
+        deadline: getOffsetDate(1), // due tomorrow
+        status: 'in_progress',
+        priority: 'high'
+      },
+      {
+        id: 't-102',
+        title: 'พัฒนา REST API ระบบ Authentication ด้วย JWT',
+        description: 'สร้าง Endpoint สมัครสมาชิก, ล็อกอิน, Refresh Token พร้อมเข้ารหัสผ่านด้วย bcrypt',
+        assigneeId: 'm3',
+        startDate: getOffsetDate(-7),
+        deadline: getOffsetDate(-1), // overdue!
+        status: 'in_progress',
+        priority: 'high'
+      },
+      {
+        id: 't-103',
+        title: 'เชื่อมต่อ API แสดงผลตารางสินค้าในหน้า Dashboard',
+        description: 'สร้าง Component ดึงข้อมูลสินค้า แสดง Pagination ค้นหา และกรองตามหมวดหมู่',
+        assigneeId: 'm1',
+        startDate: getOffsetDate(-3),
+        deadline: getOffsetDate(4),
+        status: 'todo',
+        priority: 'medium'
+      },
+      {
+        id: 't-104',
+        title: 'ทดสอบระบบการชำระเงินและแจ้งเตือนผ่านอีเมล',
+        description: 'เขียน Test Cases จำลองกรณีจ่ายสำเร็จ, ล้มเหลว และยอดเงินไม่ถูกต้อง',
+        assigneeId: 'm4',
+        startDate: getOffsetDate(-2),
+        deadline: getOffsetDate(5),
+        status: 'todo',
+        priority: 'normal'
+      },
+      {
+        id: 't-105',
+        title: 'ตรวจสอบ Responsive Design บนอุปกรณ์มือถือ iPhone & iPad',
+        description: 'ตรวจเช็คขนาดฟอนต์ ปุ่มกด และ Sidebar เมื่อแสดงผลบนหน้าจอขนาดเล็กกว่า 768px',
+        assigneeId: 'm2',
+        startDate: getOffsetDate(-5),
+        deadline: getOffsetDate(2),
+        status: 'review',
+        priority: 'medium'
+      },
+      {
+        id: 't-106',
+        title: 'ติดตั้งและตั้งค่าฐานข้อมูล PostgreSQL บนคลาวด์',
+        description: 'สร้าง Database, User, Grant Permissions และตั้งระบบ Auto Backup ประจำวัน',
+        assigneeId: 'm3',
+        startDate: getOffsetDate(-10),
+        deadline: getOffsetDate(-3),
+        status: 'done',
+        priority: 'high'
+      },
+      {
+        id: 't-107',
+        title: 'จัดทำคู่มือการใช้งานระบบสำหรับผู้ดูแลและทีมงาน',
+        description: 'เขียนเอกสาร Markdown และบันทึกคลิปสั้นอธิบายวิธีการสร้างและอัปเดตงาน',
+        assigneeId: 'm1',
+        startDate: getOffsetDate(-8),
+        deadline: getOffsetDate(-2),
+        status: 'done',
+        priority: 'normal'
+      }
+    ];
+
+    // --- State Management ---
+    let members = [];
+    let tasks = [];
+    let currentUser = 'manager'; // 'manager' or memberId (e.g. 'm1')
+    let managerFilteredMember = 'all'; // 'all' or memberId
+    let managerDisplayMode = 'kanban'; // 'kanban' or 'table'
+
+    // Load initial data from localStorage
+    function loadData() {
+      const storedMembers = localStorage.getItem('teamtask_members');
+      const storedTasks = localStorage.getItem('teamtask_tasks');
+
+      if (storedMembers) {
+        members = JSON.parse(storedMembers);
+      } else {
+        members = [...DEFAULT_MEMBERS];
+        saveMembers();
+      }
+
+      if (storedTasks) {
+        tasks = JSON.parse(storedTasks);
+      } else {
+        tasks = [...SAMPLE_TASKS];
+        saveTasks();
+      }
+    }
+
+    function saveMembers() {
+      localStorage.setItem('teamtask_members', JSON.stringify(members));
+    }
+
+    function saveTasks() {
+      localStorage.setItem('teamtask_tasks', JSON.stringify(tasks));
+    }
+
+    function resetToSampleData() {
+      if (confirm('คุณต้องการรีเซ็ตข้อมูลทั้งหมดกลับเป็นค่าเริ่มต้นตัวอย่างใช่หรือไม่?')) {
+        members = [...DEFAULT_MEMBERS];
+        tasks = [...SAMPLE_TASKS];
+        saveMembers();
+        saveTasks();
+        populateUserSelector();
+        populateAssigneeOptions();
+        renderCurrentView();
+        alert('รีเซ็ตข้อมูลตัวอย่างเรียบร้อยแล้ว!');
+      }
+    }
+
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ members, tasks }, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `teamtask_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    // --- Role & View Switcher ---
+    function populateUserSelector() {
+      const selector = document.getElementById('userSelector');
+      let html = `<option value="manager" ${currentUser === 'manager' ? 'selected' : ''}>👔 หัวหน้างาน (ผู้จัดการ)</option>`;
+      html += `<optgroup label="ทีมงานแต่ละคน">`;
+      members.forEach(m => {
+        html += `<option value="${m.id}" ${currentUser === m.id ? 'selected' : ''}>👤 ${m.name} (${m.role})</option>`;
+      });
+      html += `</optgroup>`;
+      selector.innerHTML = html;
+    }
+
+    function switchCurrentUser(userId) {
+      currentUser = userId;
+      updateHeaderBadges();
+      renderCurrentView();
+    }
+
+    function updateHeaderBadges() {
+      const badge = document.getElementById('currentViewBadge');
+      const notice = document.getElementById('viewModeNotice');
+
+      if (currentUser === 'manager') {
+        badge.innerHTML = `👔 หัวหน้างาน (ภาพรวมทีม)`;
+        badge.className = "font-bold text-indigo-900 bg-white px-2.5 py-0.5 rounded-full border border-indigo-200 shadow-xs";
+        notice.innerHTML = `<i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-500"></i><span>แสดงภาพรวมงานทั้งหมดของทุกคนในทีม สามารถมอบหมายและติดตามงานได้</span>`;
+      } else {
+        const mem = members.find(m => m.id === currentUser);
+        const name = mem ? mem.name : 'ทีมงาน';
+        badge.innerHTML = `👤 ทีมงาน: ${name}`;
+        badge.className = "font-bold text-emerald-900 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-xs";
+        notice.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i><span>มุมมองส่วนตัว: จัดการงานเฉพาะของคุณผ่าน Kanban Board (ลากวางได้)</span>`;
+      }
+      lucide.createIcons();
+    }
+
+    function renderCurrentView() {
+      if (currentUser === 'manager') {
+        document.getElementById('managerView').classList.remove('hidden');
+        document.getElementById('memberView').classList.add('hidden');
+        renderManagerView();
+      } else {
+        document.getElementById('managerView').classList.add('hidden');
+        document.getElementById('memberView').classList.remove('hidden');
+        renderMemberView();
+      }
+    }
+
+    // --- Helper Functions for Badges & Dates ---
+    function getMemberById(id) {
+      return members.find(m => m.id === id) || { name: 'ยังไม่กำหนด', role: '-', avatarColor: 'bg-slate-400' };
+    }
+
+    function getDeadlineStatus(deadlineStr, isDone) {
+      if (isDone) {
+        return { label: 'เสร็จสิ้นแล้ว', colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'check-circle-2', isOverdue: false };
+      }
+      if (!deadlineStr) return { label: 'ไม่มีกำหนดส่ง', colorClass: 'bg-slate-50 text-slate-500 border-slate-200', icon: 'calendar', isOverdue: false };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const deadline = new Date(deadlineStr);
+      deadline.setHours(0, 0, 0, 0);
+
+      const diffTime = deadline - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return { label: `เกินกำหนด ${Math.abs(diffDays)} วัน`, colorClass: 'bg-rose-50 text-rose-700 border-rose-200 font-semibold animate-pulse', icon: 'alert-circle', isOverdue: true };
+      } else if (diffDays === 0) {
+        return { label: 'ครบกำหนดวันนี้!', colorClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold', icon: 'clock', isOverdue: false };
+      } else if (diffDays <= 2) {
+        return { label: `เหลืออีก ${diffDays} วัน`, colorClass: 'bg-amber-50 text-amber-800 border-amber-200', icon: 'clock', isOverdue: false };
+      } else {
+        return { label: `${deadlineStr}`, colorClass: 'bg-slate-50 text-slate-600 border-slate-200', icon: 'calendar', isOverdue: false };
+      }
+    }
+
+    function getPriorityBadge(priority) {
+      switch (priority) {
+        case 'high':
+          return { label: 'ด่วนมาก', class: 'bg-rose-100 text-rose-800 border-rose-200' };
+        case 'medium':
+          return { label: 'ปานกลาง', class: 'bg-amber-100 text-amber-800 border-amber-200' };
+        default:
+          return { label: 'ปกติ', class: 'bg-slate-100 text-slate-700 border-slate-200' };
+      }
+    }
+
+    function getStatusBadge(status) {
+      const col = COLUMNS.find(c => c.id === status);
+      return col || { title: status, badgeClass: 'bg-slate-100 text-slate-700' };
+    }
+
+    // --- MANAGER VIEW LOGIC ---
+    function renderManagerView() {
+      // 1. Calculate & Update Dashboard Statistics
+      const total = tasks.length;
+      const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+      const done = tasks.filter(t => t.status === 'done').length;
+
+      let overdueCount = 0;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      tasks.forEach(t => {
+        if (t.status !== 'done' && t.deadline) {
+          const d = new Date(t.deadline);
+          d.setHours(0, 0, 0, 0);
+          if (d < today) overdueCount++;
+        }
+      });
+
+      document.getElementById('statTotal').innerText = total;
+      document.getElementById('statInProgress').innerText = inProgress;
+      document.getElementById('statDone').innerText = done;
+      document.getElementById('statOverdue').innerText = overdueCount;
+      document.getElementById('statOverdueSubtitle').innerText = overdueCount > 0 ? `มี ${overdueCount} รายการที่เลยกำหนดส่ง` : 'ไม่มีงานค้างที่เกินกำหนด';
+
+      const donePct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('statDonePercent').innerText = `${donePct}%`;
+      document.getElementById('statProgressBar').style.width = `${donePct}%`;
+
+      // 2. Render Team Member Cards
+      renderMemberProgressGrid();
+
+      // 3. Render either Kanban or Table based on mode
+      if (managerDisplayMode === 'kanban') {
+        document.getElementById('managerKanbanContainer').classList.remove('hidden');
+        document.getElementById('managerTableContainer').classList.add('hidden');
+        renderManagerKanban();
+      } else {
+        document.getElementById('managerKanbanContainer').classList.add('hidden');
+        document.getElementById('managerTableContainer').classList.remove('hidden');
+        renderManagerTable();
+      }
+
+      lucide.createIcons();
+    }
+
+    function renderMemberProgressGrid() {
+      const grid = document.getElementById('memberProgressGrid');
+      let html = '';
+
+      members.forEach(m => {
+        const memTasks = tasks.filter(t => t.assigneeId === m.id);
+        const memTotal = memTasks.length;
+        const memDone = memTasks.filter(t => t.status === 'done').length;
+        const memPct = memTotal > 0 ? Math.round((memDone / memTotal) * 100) : 0;
+        const isSelected = managerFilteredMember === m.id;
+
+        html += `
+          <div class="p-3 rounded-xl border ${isSelected ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-slate-300 bg-slate-50/40'} transition flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg ${m.avatarColor || 'bg-indigo-600'} text-white font-bold flex items-center justify-center text-xs shadow-xs">
+                  ${m.name.charAt(0)}
+                </div>
+                <div>
+                  <h4 class="font-bold text-xs sm:text-sm text-slate-800 leading-tight">${m.name}</h4>
+                  <span class="text-[11px] text-slate-500">${m.role}</span>
+                </div>
+              </div>
+              <span class="text-xs font-semibold ${memPct === 100 && memTotal > 0 ? 'text-emerald-600' : 'text-slate-600'}">${memPct}%</span>
+            </div>
+
+            <div class="mt-3">
+              <div class="flex justify-between text-[11px] text-slate-500 mb-1">
+                <span>ความคืบหน้า</span>
+                <span>${memDone}/${memTotal} งาน</span>
+              </div>
+              <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-indigo-600 h-full rounded-full transition-all" style="width: ${memPct}%"></div>
+              </div>
+            </div>
+
+            <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
+              <button onclick="filterManagerByMember('${m.id}')" class="text-[11px] font-semibold ${isSelected ? 'text-indigo-700' : 'text-indigo-600 hover:text-indigo-800'} flex items-center gap-1">
+                <i data-lucide="filter" class="w-3 h-3"></i> ${isSelected ? 'กำลังกรอง' : 'กรองงาน'}
+              </button>
+              <button onclick="switchCurrentUser('${m.id}')" class="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1">
+                สลับดูบอร์ด <i data-lucide="arrow-right" class="w-3 h-3"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      grid.innerHTML = html;
+    }
+
+    function filterManagerByMember(memberId) {
+      managerFilteredMember = memberId;
+      const btnAll = document.getElementById('btnFilterAll');
+      if (memberId === 'all') {
+        btnAll.className = "text-xs px-3 py-1.5 rounded-lg font-medium bg-indigo-600 text-white shadow-xs";
+      } else {
+        btnAll.className = "text-xs px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 shadow-xs";
+      }
+      renderManagerView();
+    }
+
+    function setManagerDisplayMode(mode) {
+      managerDisplayMode = mode;
+      const tabKanban = document.getElementById('mgrTabKanban');
+      const tabTable = document.getElementById('mgrTabTable');
+
+      if (mode === 'kanban') {
+        tabKanban.className = "flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white text-slate-900 shadow-xs transition";
+        tabTable.className = "flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition";
+      } else {
+        tabTable.className = "flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg bg-white text-slate-900 shadow-xs transition";
+        tabKanban.className = "flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition";
+      }
+      renderManagerView();
+    }
+
+    function getFilteredTasks() {
+      const searchTerm = (document.getElementById('mgrSearchInput')?.value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('mgrFilterStatus')?.value || 'all';
+
+      return tasks.filter(t => {
+        // Filter by member
+        if (managerFilteredMember !== 'all' && t.assigneeId !== managerFilteredMember) {
+          return false;
+        }
+        // Filter by status
+        if (statusFilter !== 'all' && t.status !== statusFilter) {
+          return false;
+        }
+        // Filter by search term
+        if (searchTerm) {
+          const assignee = getMemberById(t.assigneeId);
+          const matchTitle = t.title.toLowerCase().includes(searchTerm);
+          const matchDesc = (t.description || '').toLowerCase().includes(searchTerm);
+          const matchName = assignee.name.toLowerCase().includes(searchTerm);
+          if (!matchTitle && !matchDesc && !matchName) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderManagerKanban() {
+      const container = document.getElementById('managerKanbanContainer');
+      const filteredTasks = getFilteredTasks();
+
+      let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">`;
+
+      COLUMNS.forEach(col => {
+        const colTasks = filteredTasks.filter(t => t.status === col.id);
+
+        html += `
+          <div class="bg-slate-100/80 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col">
+            <!-- Column Header -->
+            <div class="flex items-center justify-between mb-3 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full ${col.id === 'done' ? 'bg-emerald-500' : col.id === 'in_progress' ? 'bg-amber-500' : col.id === 'review' ? 'bg-purple-500' : 'bg-slate-400'}"></span>
+                <h3 class="font-bold text-xs sm:text-sm text-slate-800">${col.title}</h3>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 shadow-2xs">${colTasks.length}</span>
+            </div>
+
+            <!-- Kanban Column Drag Area -->
+            <div class="kanban-column-content space-y-3 flex-1" id="mgr-col-${col.id}" data-status="${col.id}">
+              ${colTasks.map(t => createTaskCardHtml(t, true)).join('')}
+              ${colTasks.length === 0 ? `<div class="p-6 text-center text-xs text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">ไม่มีงานในสถานะนี้</div>` : ''}
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      container.innerHTML = html;
+
+      // Initialize Sortable on each column
+      COLUMNS.forEach(col => {
+        const el = document.getElementById(`mgr-col-${col.id}`);
+        if (el) {
+          Sortable.create(el, {
+            group: 'manager-kanban',
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: function (evt) {
+              const taskId = evt.item.getAttribute('data-task-id');
+              const newStatus = evt.to.getAttribute('data-status');
+              if (taskId && newStatus) {
+                updateTaskStatus(taskId, newStatus);
+              }
+            }
+          });
+        }
+      });
+    }
+
+    function renderManagerTable() {
+      const tbody = document.getElementById('managerTableBody');
+      const filteredTasks = getFilteredTasks();
+
+      if (filteredTasks.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 text-xs">ไม่พบงานที่ตรงกับเงื่อนไข</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      filteredTasks.forEach(t => {
+        const assignee = getMemberById(t.assigneeId);
+        const deadlineInfo = getDeadlineStatus(t.deadline, t.status === 'done');
+        const priorityInfo = getPriorityBadge(t.priority);
+        const statusInfo = getStatusBadge(t.status);
+
+        html += `
+          <tr class="hover:bg-slate-50/80 transition text-slate-700">
+            <td class="py-3 px-4">
+              <div class="font-bold text-slate-900 cursor-pointer hover:text-indigo-600" onclick="openDetailModal('${t.id}')">${t.title}</div>
+              <div class="text-slate-400 text-xs truncate max-w-xs mt-0.5">${t.description || '-'}</div>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full ${assignee.avatarColor || 'bg-slate-400'} text-white text-[10px] font-bold flex items-center justify-center">
+                  ${assignee.name.charAt(0)}
+                </span>
+                <span class="font-medium text-xs text-slate-800">${assignee.name}</span>
+              </div>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="text-xs px-2.5 py-1 rounded-full font-medium border ${statusInfo.badgeClass}">
+                ${statusInfo.title}
+              </span>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="text-[11px] px-2 py-0.5 rounded-md font-semibold border ${priorityInfo.class}">
+                ${priorityInfo.label}
+              </span>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap text-slate-500 text-xs">
+              ${t.startDate || '-'}
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap">
+              <span class="text-xs px-2 py-1 rounded-md font-medium border flex items-center gap-1 w-fit ${deadlineInfo.colorClass}">
+                <i data-lucide="${deadlineInfo.icon}" class="w-3 h-3"></i>
+                <span>${deadlineInfo.label}</span>
+              </span>
+            </td>
+            <td class="py-3 px-4 whitespace-nowrap text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="openDetailModal('${t.id}')" title="ดูรายละเอียด" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-indigo-600 transition">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+                <button onclick="editTask('${t.id}')" title="แก้ไขงาน" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-amber-600 transition">
+                  <i data-lucide="edit-2" class="w-4 h-4"></i>
+                </button>
+                <button onclick="deleteTask('${t.id}')" title="ลบงาน" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-500 hover:text-rose-600 transition">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    // --- TEAM MEMBER VIEW LOGIC ---
+    function renderMemberView() {
+      const member = getMemberById(currentUser);
+      document.getElementById('memberNameGreeting').innerText = `สวัสดี, คุณ${member.name}`;
+      document.getElementById('memberRoleTag').innerText = member.role || 'ทีมงาน';
+      document.getElementById('memberAvatar').innerText = member.name.charAt(0);
+      document.getElementById('memberAvatar').className = `w-14 h-14 rounded-2xl ${member.avatarColor || 'bg-indigo-600'} text-white border border-white/30 flex items-center justify-center text-xl font-bold shadow-inner`;
+
+      // Calculate member stats
+      const myTasks = tasks.filter(t => t.assigneeId === currentUser);
+      const pendingCount = myTasks.filter(t => t.status !== 'done').length;
+      const doneCount = myTasks.filter(t => t.status === 'done').length;
+
+      document.getElementById('memberPendingCount').innerText = pendingCount;
+      document.getElementById('memberDoneCount').innerText = doneCount;
+
+      renderMemberKanban();
+      lucide.createIcons();
+    }
+
+    function renderMemberKanban() {
+      const container = document.getElementById('memberKanbanContainer');
+      const searchTerm = (document.getElementById('memberSearchInput')?.value || '').toLowerCase().trim();
+
+      const myTasks = tasks.filter(t => {
+        if (t.assigneeId !== currentUser) return false;
+        if (searchTerm) {
+          const matchTitle = t.title.toLowerCase().includes(searchTerm);
+          const matchDesc = (t.description || '').toLowerCase().includes(searchTerm);
+          if (!matchTitle && !matchDesc) return false;
+        }
+        return true;
+      });
+
+      let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">`;
+
+      COLUMNS.forEach(col => {
+        const colTasks = myTasks.filter(t => t.status === col.id);
+
+        html += `
+          <div class="bg-slate-100/90 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-3 px-1">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full ${col.id === 'done' ? 'bg-emerald-500' : col.id === 'in_progress' ? 'bg-amber-500' : col.id === 'review' ? 'bg-purple-500' : 'bg-slate-400'}"></span>
+                <h3 class="font-bold text-xs sm:text-sm text-slate-800">${col.title}</h3>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 shadow-2xs">${colTasks.length}</span>
+            </div>
+
+            <!-- Drag & Drop Area -->
+            <div class="kanban-column-content space-y-3 flex-1" id="mem-col-${col.id}" data-status="${col.id}">
+              ${colTasks.map(t => createTaskCardHtml(t, false)).join('')}
+              ${colTasks.length === 0 ? `<div class="p-6 text-center text-xs text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">ไม่มีงานในช่องนี้</div>` : ''}
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      container.innerHTML = html;
+
+      // Enable Sortable for member Kanban
+      COLUMNS.forEach(col => {
+        const el = document.getElementById(`mem-col-${col.id}`);
+        if (el) {
+          Sortable.create(el, {
+            group: 'member-kanban',
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: function (evt) {
+              const taskId = evt.item.getAttribute('data-task-id');
+              const newStatus = evt.to.getAttribute('data-status');
+              if (taskId && newStatus) {
+                updateTaskStatus(taskId, newStatus);
+              }
+            }
+          });
+        }
+      });
+    }
+
+    // --- REUSABLE TASK CARD HTML GENERATOR ---
+    function createTaskCardHtml(task, showAssignee) {
+      const assignee = getMemberById(task.assigneeId);
+      const deadlineInfo = getDeadlineStatus(task.deadline, task.status === 'done');
+      const priorityInfo = getPriorityBadge(task.priority);
+
+      return `
+        <div class="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing group relative" data-task-id="${task.id}">
+          
+          <!-- Top Row: Priority & Menu -->
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-semibold border ${priorityInfo.class}">
+              ${priorityInfo.label}
+            </span>
+            <div class="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition">
+              <button onclick="editTask('${task.id}')" title="แก้ไข" class="p-1 text-slate-400 hover:text-amber-600 rounded hover:bg-slate-100">
+                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="deleteTask('${task.id}')" title="ลบ" class="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-100">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Title -->
+          <h4 onclick="openDetailModal('${task.id}')" class="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-indigo-600 transition leading-snug cursor-pointer mb-1.5">
+            ${task.title}
+          </h4>
+
+          <!-- Description Preview -->
+          ${task.description ? `<p class="text-xs text-slate-500 line-clamp-2 mb-3 leading-relaxed">${task.description}</p>` : ''}
+
+          <!-- Footer Metadata -->
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px]">
+            
+            <!-- Deadline Badge -->
+            <div class="flex items-center gap-1 px-2 py-0.5 rounded-md border ${deadlineInfo.colorClass}">
+              <i data-lucide="${deadlineInfo.icon}" class="w-3 h-3"></i>
+              <span>${deadlineInfo.label}</span>
+            </div>
+
+            <!-- Assignee Avatar (if in Manager View) -->
+            ${showAssignee ? `
+              <div class="flex items-center gap-1.5" title="ผู้รับผิดชอบ: ${assignee.name}">
+                <span class="w-5 h-5 rounded-full ${assignee.avatarColor || 'bg-slate-400'} text-white text-[9px] font-bold flex items-center justify-center">
+                  ${assignee.name.charAt(0)}
+                </span>
+                <span class="text-slate-600 font-medium text-[11px] truncate max-w-[80px]">${assignee.name.split(' ')[0]}</span>
+              </div>
+            ` : `
+              <span class="text-slate-400 text-[10px] flex items-center gap-0.5">
+                <i data-lucide="calendar" class="w-3 h-3"></i> เริ่ม: ${task.startDate || '-'}
+              </span>
+            `}
+
+          </div>
+        </div>
+      `;
+    }
+
+    // --- Task CRUD Operations ---
+    function updateTaskStatus(taskId, newStatus) {
+      const taskIndex = tasks.findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        tasks[taskIndex].status = newStatus;
+        saveTasks();
+        renderCurrentView();
+      }
+    }
+
+    function openTaskModal(taskId = null) {
+      const form = document.getElementById('taskForm');
+      form.reset();
+      populateAssigneeOptions();
+
+      // Set default start date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('taskStartDate').value = today;
+
+      // Default deadline to 3 days ahead
+      document.getElementById('taskDeadline').value = getOffsetDate(3);
+
+      if (taskId) {
+        // Edit mode
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          document.getElementById('taskModalTitle').innerHTML = `<i data-lucide="edit-3" class="w-4 h-4 text-indigo-600"></i> แก้ไขงาน`;
+          document.getElementById('taskId').value = task.id;
+          document.getElementById('taskTitle').value = task.title;
+          document.getElementById('taskDescription').value = task.description || '';
+          document.getElementById('taskAssignee').value = task.assigneeId;
+          document.getElementById('taskStatus').value = task.status;
+          document.getElementById('taskPriority').value = task.priority || 'normal';
+          document.getElementById('taskStartDate').value = task.startDate || today;
+          document.getElementById('taskDeadline').value = task.deadline || '';
+        }
+      } else {
+        // Create mode
+        document.getElementById('taskModalTitle').innerHTML = `<i data-lucide="plus-circle" class="w-4 h-4 text-indigo-600"></i> สร้างงานใหม่`;
+        document.getElementById('taskId').value = '';
+        if (currentUser !== 'manager') {
+          document.getElementById('taskAssignee').value = currentUser;
+        }
+      }
+
+      document.getElementById('taskModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function openTaskModalForCurrentUser() {
+      openTaskModal();
+      document.getElementById('taskAssignee').value = currentUser;
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+    }
+
+    function handleTaskSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('taskId').value;
+      const title = document.getElementById('taskTitle').value.trim();
+      const description = document.getElementById('taskDescription').value.trim();
+      const assigneeId = document.getElementById('taskAssignee').value;
+      const status = document.getElementById('taskStatus').value;
+      const priority = document.getElementById('taskPriority').value;
+      const startDate = document.getElementById('taskStartDate').value;
+      const deadline = document.getElementById('taskDeadline').value;
+
+      if (!title || !assigneeId || !deadline) {
+        alert('กรุณากรอกข้อมูลสำคัญ (ชื่องาน, ผู้รับผิดชอบ และกำหนดส่ง) ให้ครบถ้วน');
+        return;
+      }
+
+      if (id) {
+        // Update existing task
+        const index = tasks.findIndex(t => t.id === id);
+        if (index !== -1) {
+          tasks[index] = { ...tasks[index], title, description, assigneeId, status, priority, startDate, deadline };
+        }
+      } else {
+        // Create new task
+        const newTask = {
+          id: 't-' + Date.now(),
+          title,
+          description,
+          assigneeId,
+          status,
+          priority,
+          startDate,
+          deadline
+        };
+        tasks.unshift(newTask);
+      }
+
+      saveTasks();
+      closeTaskModal();
+      renderCurrentView();
+    }
+
+    function editTask(taskId) {
+      closeDetailModal();
+      openTaskModal(taskId);
+    }
+
+    function deleteTask(taskId) {
+      if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบงานนี้?')) {
+        tasks = tasks.filter(t => t.id !== taskId);
+        saveTasks();
+        closeDetailModal();
+        renderCurrentView();
+      }
+    }
+
+    function populateAssigneeOptions() {
+      const select = document.getElementById('taskAssignee');
+      select.innerHTML = members.map(m => `
+        <option value="${m.id}">${m.name} (${m.role})</option>
+      `).join('');
+    }
+
+    // --- Task Detail Modal ---
+    function openDetailModal(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const assignee = getMemberById(task.assigneeId);
+      const priorityInfo = getPriorityBadge(task.priority);
+      const statusInfo = getStatusBadge(task.status);
+
+      document.getElementById('detailTitle').innerText = task.title;
+      document.getElementById('detailDescription').innerText = task.description || '(ไม่มีรายละเอียดเพิ่มเติม)';
+      document.getElementById('detailAssignee').innerText = `${assignee.name} (${assignee.role})`;
+      document.getElementById('detailStatus').innerText = statusInfo.title;
+      document.getElementById('detailStartDate').innerText = task.startDate || '-';
+      document.getElementById('detailDeadline').innerText = task.deadline || '-';
+
+      const priBadge = document.getElementById('detailPriorityBadge');
+      priBadge.innerText = priorityInfo.label;
+      priBadge.className = `text-xs px-2.5 py-0.5 rounded-full font-semibold border ${priorityInfo.class}`;
+
+      // Set action buttons
+      document.getElementById('btnEditFromDetail').onclick = () => editTask(task.id);
+      document.getElementById('btnDeleteFromDetail').onclick = () => deleteTask(task.id);
+
+      document.getElementById('detailModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    // --- Team Member Management Modal ---
+    function openTeamManagementModal() {
+      renderModalMemberList();
+      document.getElementById('teamModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeTeamModal() {
+      document.getElementById('teamModal').classList.add('hidden');
+    }
+
+    function renderModalMemberList() {
+      const list = document.getElementById('modalMemberList');
+      let html = '';
+      members.forEach(m => {
+        const count = tasks.filter(t => t.assigneeId === m.id).length;
+        html += `
+          <div class="py-2.5 flex items-center justify-between text-xs sm:text-sm">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg ${m.avatarColor || 'bg-indigo-600'} text-white font-bold flex items-center justify-center text-xs">
+                ${m.name.charAt(0)}
+              </span>
+              <div>
+                <span class="font-bold text-slate-800 block">${m.name}</span>
+                <span class="text-xs text-slate-500">${m.role} &bull; ${count} งาน</span>
+              </div>
+            </div>
+            ${members.length > 1 ? `
+              <button onclick="removeMember('${m.id}')" class="text-slate-400 hover:text-rose-600 p-1 rounded-lg">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            ` : ''}
+          </div>
+        `;
+      });
+      list.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function handleAddMember(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('newMemberName');
+      const roleInput = document.getElementById('newMemberRole');
+      const name = nameInput.value.trim();
+      const role = roleInput.value.trim() || 'สมาชิกในทีม';
+
+      if (!name) return;
+
+      const colors = ['bg-indigo-600', 'bg-blue-600', 'bg-rose-600', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-600'];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+      const newMember = {
+        id: 'm-' + Date.now(),
+        name,
+        role,
+        avatarColor: randomColor
+      };
+
+      members.push(newMember);
+      saveMembers();
+      nameInput.value = '';
+      roleInput.value = '';
+      renderModalMemberList();
+      populateUserSelector();
+      populateAssigneeOptions();
+      renderCurrentView();
+    }
+
+    function removeMember(memberId) {
+      const hasTasks = tasks.some(t => t.assigneeId === memberId);
+      if (hasTasks) {
+        if (!confirm('สมาชิกคนนี้มีงานที่ได้รับมอบหมายอยู่ คุณต้องการลบและยกเลิกผู้รับผิดชอบงานเหล่านั้นหรือไม่?')) {
+          return;
+        }
+      } else {
+        if (!confirm('ต้องการลบสมาชิกคนนี้ใช่หรือไม่?')) return;
+      }
+
+      members = members.filter(m => m.id !== memberId);
+      saveMembers();
+
+      // If current user is the removed member, reset to manager
+      if (currentUser === memberId) {
+        currentUser = 'manager';
+      }
+
+      populateUserSelector();
+      populateAssigneeOptions();
+      renderModalMemberList();
+      renderCurrentView();
+    }
+
+    // --- Utility: Toggle Dropdown Menus ---
+    function toggleMenu(menuId) {
+      const menu = document.getElementById(menuId);
+      menu.classList.toggle('hidden');
+    }
+
+    // Close dropdown menu when clicking outside
+    document.addEventListener('click', function(event) {
+      const moreMenu = document.getElementById('moreMenu');
+      if (!moreMenu.classList.contains('hidden')) {
+        const isClickInside = moreMenu.contains(event.target) || event.target.closest('button[onclick*="toggleMenu"]');
+        if (!isClickInside) {
+          moreMenu.classList.add('hidden');
+        }
+      }
+    });
+
+    // --- Application Initialization ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      populateUserSelector();
+      populateAssigneeOptions();
+      updateHeaderBadges();
+      renderCurrentView();
+    });
+  </script>
+</body>
+</html>
